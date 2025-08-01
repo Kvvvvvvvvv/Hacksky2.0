@@ -1,10 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-// External API endpoints for enhanced detection
-const EXTERNAL_APIS = {
-  deepware: "https://api.deepware.ai/v1/analyze",
-  sensity: "https://api.sensity.ai/v2/detect",
-  microsoft: "https://api.cognitive.microsoft.com/vision/v3.2/analyze"
+// FastAPI backend configuration
+const FASTAPI_BASE_URL = process.env.FASTAPI_BASE_URL || "http://localhost:8000"
+
+interface FastAPIDetectionResponse {
+  prediction: string  // "Real" or "Deepfake"
+  confidence: number
+  image_importance: number
+  audio_importance: number
+  text_importance: number
+  transcript: string
 }
 
 interface AnalysisResult {
@@ -35,91 +40,120 @@ interface AnalysisResult {
   }
 }
 
-async function analyzeWithExternalAPI(fileBuffer: Buffer, filename: string, apiUrl: string) {
-  try {
-    // This is a placeholder for external API integration
-    // In production, you would make actual API calls to services like:
-    // - Deepware AI
-    // - Sensity AI
-    // - Microsoft Azure Cognitive Services
-    // - AWS Rekognition
+// Convert FastAPI response to frontend format
+function convertFastAPIResponse(fastAPIResult: FastAPIDetectionResponse, filename: string, filesize: string, filetype: 'image' | 'video', processingTime: string): AnalysisResult {
+  const isDeepfake = fastAPIResult.prediction === "Deepfake"
+  const confidence = Math.round(fastAPIResult.confidence * 100)
+  
+  // Calculate risk level based on confidence
+  const riskLevel: 'low' | 'medium' | 'high' = 
+    confidence > 75 ? 'high' : 
+    confidence > 50 ? 'medium' : 'low'
+
+  // Generate recommendation based on prediction
+  let recommendation = ''
+  if (isDeepfake) {
+    if (riskLevel === 'high') {
+      recommendation = 'High probability of deepfake detected. Manual review strongly recommended before publishing.'
+    } else if (riskLevel === 'medium') {
+      recommendation = 'Potential signs of deepfake manipulation found. Consider additional verification.'
+    } else {
+      recommendation = 'Some suspicious patterns detected but confidence is low. Proceed with caution.'
+    }
+  } else {
+    recommendation = 'Content appears authentic based on our AI analysis. Safe to proceed.'
+  }
+
+  // Calculate dynamic metrics based on prediction and confidence
+  const calculateDynamicMetrics = (prediction: string, confidence: number, image_importance: number, audio_importance: number, text_importance: number) => {
+    const isReal = prediction === "Real"
+    const confidencePercent = Math.round(confidence * 100)
     
-    // Simulating external API response
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    return Math.random() * 100
-  } catch (error) {
-    console.error(`External API error: ${error}`)
-    return null
+    // Base metrics calculation
+    let faceConsistency, temporalConsistency, artifactDetection, lightingAnalysis, compressionArtifacts, motionAnalysis, audioVisualSync
+    
+    if (isReal) {
+      // For REAL content: High confidence = better consistency scores
+      faceConsistency = Math.max(70, Math.min(95, 70 + (confidencePercent - 50) * 0.5))
+      temporalConsistency = Math.max(75, Math.min(98, 75 + (confidencePercent - 50) * 0.4))
+      artifactDetection = Math.max(5, Math.min(30, 30 - (confidencePercent - 50) * 0.4)) // Lower is better for real content
+      lightingAnalysis = Math.max(80, Math.min(95, 80 + (confidencePercent - 50) * 0.3))
+      compressionArtifacts = Math.max(10, Math.min(25, 25 - (confidencePercent - 50) * 0.3))
+      motionAnalysis = Math.max(80, Math.min(96, 80 + (confidencePercent - 50) * 0.3))
+      audioVisualSync = Math.max(85, Math.min(98, 85 + (confidencePercent - 50) * 0.25))
+    } else {
+      // For DEEPFAKE content: High confidence = worse consistency scores
+      faceConsistency = Math.max(15, Math.min(45, 45 - (confidencePercent - 50) * 0.5))
+      temporalConsistency = Math.max(20, Math.min(50, 50 - (confidencePercent - 50) * 0.4))
+      artifactDetection = Math.max(70, Math.min(95, 70 + (confidencePercent - 50) * 0.4)) // Higher is worse for deepfake
+      lightingAnalysis = Math.max(25, Math.min(60, 60 - (confidencePercent - 50) * 0.3))
+      compressionArtifacts = Math.max(60, Math.min(90, 60 + (confidencePercent - 50) * 0.4))
+      motionAnalysis = Math.max(20, Math.min(55, 55 - (confidencePercent - 50) * 0.3))
+      audioVisualSync = Math.max(30, Math.min(70, 70 - (confidencePercent - 50) * 0.25))
+    }
+    
+    // Adjust based on component importance
+    const imageInfluence = image_importance * 20 // Scale influence
+    const audioInfluence = audio_importance * 15
+    
+    if (!isReal) {
+      // For deepfakes, higher image importance means worse face/temporal consistency
+      faceConsistency = Math.max(10, faceConsistency - imageInfluence)
+      temporalConsistency = Math.max(15, temporalConsistency - imageInfluence)
+      audioVisualSync = Math.max(20, audioVisualSync - audioInfluence)
+    } else {
+      // For real content, higher importance scores mean better consistency
+      faceConsistency = Math.min(98, faceConsistency + imageInfluence * 0.3)
+      temporalConsistency = Math.min(98, temporalConsistency + imageInfluence * 0.3)
+      audioVisualSync = Math.min(98, audioVisualSync + audioInfluence * 0.3)
+    }
+    
+    return {
+      faceConsistency: Math.round(faceConsistency),
+      temporalConsistency: Math.round(temporalConsistency),
+      artifactDetection: Math.round(artifactDetection),
+      lightingAnalysis: Math.round(lightingAnalysis),
+      compressionArtifacts: Math.round(compressionArtifacts),
+      motionAnalysis: Math.round(motionAnalysis),
+      audioVisualSync: Math.round(audioVisualSync),
+      metadataAnalysis: Math.round((audio_importance + text_importance) * 50 + (isReal ? 20 : -10)),
+      pixelPatterns: Math.round(isReal ? 85 - image_importance * 30 : 60 + image_importance * 35)
+    }
   }
-}
 
-function analyzeFilename(filename: string): { suspicious: boolean, score: number, patterns: string[] } {
-  const suspiciousPatterns = [
-    'fake', 'deepfake', 'ai_generated', 'synthetic', 'generated',
-    'face_swap', 'faceswap', 'manipulated', 'edited', 'modified',
-    'artificial', 'computer_generated', 'cg', 'vfx', 'sfx'
-  ]
-  
-  const realPatterns = [
-    'real', 'original', 'authentic', 'genuine', 'unedited',
-    'raw', 'camera', 'phone', 'selfie', 'photo', 'live',
-    'candid', 'natural', 'spontaneous'
-  ]
+  // Map importance scores to detail metrics using dynamic calculation
+  const details = {
+    ...calculateDynamicMetrics(
+      fastAPIResult.prediction,
+      fastAPIResult.confidence,
+      fastAPIResult.image_importance,
+      fastAPIResult.audio_importance,
+      fastAPIResult.text_importance
+    ),
+    // Remove video-specific metrics for non-video files
+    ...(filetype !== 'video' && {
+      temporalConsistency: 0,
+      motionAnalysis: 0,
+      audioVisualSync: 0
+    })
+  }
 
-  const lowerFilename = filename.toLowerCase()
-  const foundSuspicious = suspiciousPatterns.filter(pattern => lowerFilename.includes(pattern))
-  const foundReal = realPatterns.filter(pattern => lowerFilename.includes(pattern))
-  
-  let score = 50 // Neutral baseline
-  
-  if (foundSuspicious.length > 0) {
-    score += foundSuspicious.length * 20 // Increase suspicion
-  }
-  
-  if (foundReal.length > 0) {
-    score -= foundReal.length * 15 // Decrease suspicion
-  }
-  
-  // Check for random/generated filenames
-  const nameWithoutExt = filename.replace(/\.[^/.]+$/, "")
-  if (/^[a-f0-9]{8,}$/i.test(nameWithoutExt) || /^\d{10,}$/.test(nameWithoutExt)) {
-    score += 10 // Suspicious hash-like or timestamp-like names
-  }
-  
   return {
-    suspicious: score > 60,
-    score: Math.min(100, Math.max(0, score)),
-    patterns: [...foundSuspicious, ...foundReal]
+    confidence,
+    isDeepfake,
+    details,
+    processingTime,
+    modelVersion: "v4.0.0 (FastAPI Backend)",
+    riskLevel,
+    recommendation,
+    filename,
+    filesize,
+    filetype,
+    // Add transcript information if available
+    ...(fastAPIResult.transcript && fastAPIResult.transcript !== "No transcription available" && {
+      transcript: fastAPIResult.transcript
+    })
   }
-}
-
-function analyzeFileMetadata(file: File): { score: number, flags: string[] } {
-  const flags: string[] = []
-  let score = 0
-  
-  // File size analysis
-  if (file.size < 10000) {
-    flags.push('unusually_small_file')
-    score += 15
-  } else if (file.size > 100000000) {
-    flags.push('unusually_large_file')
-    score += 5
-  }
-  
-  // File type analysis
-  const extension = file.name.split('.').pop()?.toLowerCase()
-  if (!extension || !['jpg', 'jpeg', 'png', 'mp4', 'mov', 'avi', 'webm'].includes(extension)) {
-    flags.push('suspicious_extension')
-    score += 20
-  }
-  
-  // MIME type check
-  if (file.type && !file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-    flags.push('mime_type_mismatch')
-    score += 25
-  }
-  
-  return { score, flags }
 }
 
 export async function POST(request: NextRequest) {
@@ -146,119 +180,56 @@ export async function POST(request: NextRequest) {
     }
 
     const supportedTypes = [
-      'image/jpeg', 'image/png', 'image/webp', 'image/gif',
       'video/mp4', 'video/webm', 'video/quicktime', 'video/avi'
     ]
     
     if (!supportedTypes.includes(file.type)) {
       return NextResponse.json({ 
         success: false, 
-        error: "Unsupported file type" 
+        error: "Only video files are supported for deepfake detection" 
       }, { status: 400 })
     }
 
-    // Convert file to buffer for analysis
-    const fileBuffer = Buffer.from(await file.arrayBuffer())
     const filename = file.name
     const filesize = `${(file.size / 1024 / 1024).toFixed(2)} MB`
-    const filetype = file.type.startsWith('image/') ? 'image' : 'video'
+    const filetype = 'video' as const
 
-    // Perform multiple analyses
-    const filenameAnalysis = analyzeFilename(filename)
-    const metadataAnalysis = analyzeFileMetadata(file)
-    
-    // Simulate advanced AI analysis
-    await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 2000))
-    
-    // Combine analysis results
-    let confidence = 30 + Math.random() * 40 // Base confidence 30-70%
-    
-    // Apply filename analysis
-    confidence = (confidence + filenameAnalysis.score) / 2
-    
-    // Apply metadata analysis
-    confidence += metadataAnalysis.score * 0.3
-    
-    // Ensure confidence is within bounds
-    confidence = Math.min(100, Math.max(0, confidence))
-    
-    const isDeepfake = confidence > 50
-    const riskLevel: 'low' | 'medium' | 'high' = 
-      confidence > 75 ? 'high' : 
-      confidence > 50 ? 'medium' : 'low'
+    // Forward the file to FastAPI backend
+    const fastAPIFormData = new FormData()
+    fastAPIFormData.append('file', file)
 
-    // Generate recommendation
-    let recommendation = ''
-    if (isDeepfake) {
-      if (riskLevel === 'high') {
-        recommendation = 'High probability of manipulation detected. Manual review strongly recommended before publishing.'
-      } else if (riskLevel === 'medium') {
-        recommendation = 'Potential signs of manipulation found. Consider additional verification.'
-      } else {
-        recommendation = 'Some suspicious patterns detected but confidence is low. Proceed with caution.'
-      }
-    } else {
-      recommendation = 'Content appears authentic based on our analysis. Safe to proceed.'
+    const fastAPIResponse = await fetch(`${FASTAPI_BASE_URL}/detect`, {
+      method: 'POST',
+      body: fastAPIFormData,
+    })
+
+    if (!fastAPIResponse.ok) {
+      const errorText = await fastAPIResponse.text()
+      console.error('FastAPI error:', fastAPIResponse.status, errorText)
+      
+      return NextResponse.json({ 
+        success: false, 
+        error: `Backend analysis failed: ${fastAPIResponse.statusText}`,
+        details: errorText
+      }, { status: fastAPIResponse.status })
     }
 
-    // Attempt external API calls (in parallel)
-    const externalPromises = [
-      analyzeWithExternalAPI(fileBuffer, filename, EXTERNAL_APIS.deepware),
-      analyzeWithExternalAPI(fileBuffer, filename, EXTERNAL_APIS.sensity),
-      analyzeWithExternalAPI(fileBuffer, filename, EXTERNAL_APIS.microsoft)
-    ]
-    
-    const [deepwareResult, sensityResult, microsoftResult] = await Promise.allSettled(externalPromises)
-    
-    const externalAPIs: any = {}
-    if (deepwareResult.status === 'fulfilled' && deepwareResult.value !== null) {
-      externalAPIs.deepware = deepwareResult.value
-    }
-    if (sensityResult.status === 'fulfilled' && sensityResult.value !== null) {
-      externalAPIs.sensity = sensityResult.value
-    }
-    if (microsoftResult.status === 'fulfilled' && microsoftResult.value !== null) {
-      externalAPIs.microsoft = microsoftResult.value
-    }
-
+    const fastAPIResult: FastAPIDetectionResponse = await fastAPIResponse.json()
     const processingTime = `${((Date.now() - startTime) / 1000).toFixed(1)}s`
 
-    const analysis: AnalysisResult = {
-      confidence: Math.round(confidence),
-      isDeepfake,
-      details: {
-        faceConsistency: Math.round(100 - confidence + Math.random() * 20),
-        temporalConsistency: filetype === 'video' ? 
-          Math.round(100 - confidence + Math.random() * 20) : 
-          Math.round(100 - confidence + Math.random() * 15),
-        artifactDetection: Math.round(confidence + Math.random() * 15),
-        lightingAnalysis: Math.round(90 - confidence * 0.5 + Math.random() * 20),
-        compressionArtifacts: Math.round(confidence * 0.8 + Math.random() * 20),
-        metadataAnalysis: metadataAnalysis.score,
-        pixelPatterns: Math.round(confidence * 0.9 + Math.random() * 10),
-        ...(filetype === 'video' && {
-          motionAnalysis: Math.round(100 - confidence + Math.random() * 15),
-          audioVisualSync: Math.round(95 - confidence * 0.3 + Math.random() * 10)
-        })
-      },
-      processingTime,
-      modelVersion: "v3.2.1",
-      riskLevel,
-      recommendation,
-      filename,
-      filesize,
-      filetype,
-      ...(Object.keys(externalAPIs).length > 0 && { externalAPIs })
-    }
+    // Convert FastAPI response to frontend format
+    const analysis = convertFastAPIResponse(fastAPIResult, filename, filesize, filetype, processingTime)
 
     return NextResponse.json({
       success: true,
       analysis,
-      debug: {
-        filenameAnalysis,
-        metadataAnalysis,
-        detectedPatterns: filenameAnalysis.patterns,
-        metadataFlags: metadataAnalysis.flags
+      backend: {
+        prediction: fastAPIResult.prediction,
+        confidence: fastAPIResult.confidence,
+        image_importance: fastAPIResult.image_importance,
+        audio_importance: fastAPIResult.audio_importance,
+        text_importance: fastAPIResult.text_importance,
+        transcript: fastAPIResult.transcript
       }
     })
     

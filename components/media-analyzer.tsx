@@ -214,8 +214,8 @@ const DetailedAnalysisDialog = ({ fileAnalysis, isOpen, onClose }: DetailedAnaly
 }
 
 const SUPPORTED_TYPES = {
-  image: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
-  video: ['video/mp4', 'video/webm', 'video/quicktime', 'video/avi']
+  image: [],
+  video: ['video/mp4', 'video/webm', 'video/quicktime', 'video/avi', 'video/ogg']
 }
 
 export default function MediaAnalyzer() {
@@ -229,11 +229,10 @@ export default function MediaAnalyzer() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const isSupported = (file: File) => {
-    return [...SUPPORTED_TYPES.image, ...SUPPORTED_TYPES.video].includes(file.type)
+    return SUPPORTED_TYPES.video.includes(file.type)
   }
 
   const getFileType = (file: File): 'image' | 'video' | 'unknown' => {
-    if (SUPPORTED_TYPES.image.includes(file.type)) return 'image'
     if (SUPPORTED_TYPES.video.includes(file.type)) return 'video'
     return 'unknown'
   }
@@ -274,82 +273,36 @@ export default function MediaAnalyzer() {
         throw new Error(data.error || 'Analysis failed')
       }
       
+      // USE THE ACTUAL BACKEND RESPONSE - NO MORE RANDOM DATA!
       return data.analysis
     } catch (error) {
-      // Fallback to client-side heuristic analysis
-      const filename = file.name.toLowerCase()
-      const filesize = formatFileSize(file.size)
+      console.error('Backend analysis failed:', error)
+      
+      // Only support video files for deepfake detection
       const filetype = getFileType(file)
-      
-      let confidence = Math.random() * 100
-      let riskLevel: 'low' | 'medium' | 'high' = 'low'
-      let recommendation = ''
-      
-      // Check for suspicious patterns in filename
-      const suspiciousPatterns = [
-        'fake', 'deepfake', 'ai_generated', 'synthetic', 'generated',
-        'face_swap', 'faceswap', 'manipulated', 'edited', 'modified'
-      ]
-      
-      const realPatterns = [
-        'real', 'original', 'authentic', 'genuine', 'unedited',
-        'raw', 'camera', 'phone', 'selfie', 'photo'
-      ]
-      
-      const hasSuspiciousPattern = suspiciousPatterns.some(pattern => filename.includes(pattern))
-      const hasRealPattern = realPatterns.some(pattern => filename.includes(pattern))
-      
-      if (hasSuspiciousPattern) {
-        confidence = Math.random() * 30 + 70
-        riskLevel = 'high'
-        recommendation = 'File contains suspicious naming patterns. Manual review recommended.'
-      } else if (hasRealPattern) {
-        confidence = Math.random() * 30 + 10
-        riskLevel = 'low'
-        recommendation = 'File appears to be authentic based on naming patterns.'
-      } else {
-        const extension = filename.split('.').pop() || ''
-        const nameWithoutExt = filename.replace(`.${extension}`, '')
-        
-        if (nameWithoutExt.length < 3 || /^\d+$/.test(nameWithoutExt)) {
-          confidence = Math.random() * 20 + 40
-          riskLevel = 'medium'
-          recommendation = 'Unusual filename pattern detected. Consider verification.'
-        }
+      if (filetype !== 'video') {
+        throw new Error('Only video files are supported for deepfake detection')
       }
       
-      if (file.size < 10000) {
-        confidence += 20
-        riskLevel = 'medium'
-      } else if (file.size > 100000000) {
-        confidence -= 10
-      }
-      
-      const isDeepfake = confidence > 50
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000))
-      
+      // Return error state instead of fake data
       return {
-        confidence: Math.round(confidence),
-        isDeepfake,
+        confidence: 0,
+        isDeepfake: false,
         details: {
-          faceConsistency: Math.round(100 - confidence + Math.random() * 20),
-          temporalConsistency: filetype === 'video' ? Math.round(100 - confidence + Math.random() * 20) : Math.round(100 - confidence + Math.random() * 15),
-          artifactDetection: Math.round(confidence + Math.random() * 10),
-          lightingAnalysis: Math.round(90 - confidence * 0.5 + Math.random() * 20),
-          compressionArtifacts: Math.round(confidence * 0.8 + Math.random() * 20),
-          ...(filetype === 'video' && {
-            motionAnalysis: Math.round(100 - confidence + Math.random() * 15),
-            audioVisualSync: Math.round(95 - confidence * 0.3 + Math.random() * 10)
-          })
+          faceConsistency: 0,
+          temporalConsistency: 0,
+          artifactDetection: 0,
+          lightingAnalysis: 0,
+          compressionArtifacts: 0,
+          motionAnalysis: 0,
+          audioVisualSync: 0
         },
-        processingTime: `${(2 + Math.random() * 3).toFixed(1)}s`,
-        modelVersion: "v3.2.1",
-        riskLevel,
-        recommendation,
+        processingTime: '0s',
+        modelVersion: 'Backend Unavailable',
+        riskLevel: 'low' as const,
+        recommendation: 'Backend analysis failed. Please ensure FastAPI server is running on localhost:8000',
         filename: file.name,
-        filesize,
+        filesize: formatFileSize(file.size),
         filetype
       }
     }
@@ -497,10 +450,10 @@ export default function MediaAnalyzer() {
         {/* Upload Area */}
         <Card className="relative overflow-hidden">
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Upload className="h-5 w-5" />
-              <span>Upload Media for Analysis</span>
-            </CardTitle>
+                         <CardTitle className="flex items-center space-x-2">
+               <Upload className="h-5 w-5" />
+               <span>Upload Videos for Deepfake Detection</span>
+             </CardTitle>
           </CardHeader>
           <CardContent>
             <div
@@ -517,37 +470,33 @@ export default function MediaAnalyzer() {
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
             >
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/*,video/*"
-                onChange={(e) => e.target.files && handleFiles(e.target.files)}
-                className="hidden"
-              />
+                             <input
+                 ref={fileInputRef}
+                 type="file"
+                 multiple
+                 accept="video/*"
+                 onChange={(e) => e.target.files && handleFiles(e.target.files)}
+                 className="hidden"
+               />
               
               <div className="space-y-4">
                 <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center group-hover:bg-primary/20 transition-colors">
                   <Upload className="h-8 w-8 text-primary" />
                 </div>
                 
-                <div>
-                  <p className="text-lg font-medium">Drop files here or click to upload</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Supports images (JPG, PNG, WebP) and videos (MP4, WebM, MOV)
-                  </p>
-                </div>
-                
-                <div className="flex items-center justify-center space-x-4 text-xs text-muted-foreground">
-                  <div className="flex items-center space-x-1">
-                    <FileImage className="h-3 w-3" />
-                    <span>Images</span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <FileVideo className="h-3 w-3" />
-                    <span>Videos</span>
-                  </div>
-                </div>
+                                 <div>
+                   <p className="text-lg font-medium">Drop video files here or click to upload</p>
+                   <p className="text-sm text-muted-foreground mt-1">
+                     Supports videos (MP4, WebM, AVI, MOV, OGG) for deepfake detection
+                   </p>
+                 </div>
+                 
+                 <div className="flex items-center justify-center space-x-4 text-xs text-muted-foreground">
+                   <div className="flex items-center space-x-1">
+                     <FileVideo className="h-3 w-3" />
+                     <span>Videos Only</span>
+                   </div>
+                 </div>
               </div>
             </div>
             

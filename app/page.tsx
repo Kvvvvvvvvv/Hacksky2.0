@@ -12,11 +12,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Heart, MessageCircle, Share, Bookmark, MoreHorizontal, Camera, Shield, AlertTriangle, Plus, Trash2, User, LogOut } from "lucide-react"
+import { Heart, MessageCircle, Share, Bookmark, MoreHorizontal, Camera, Send, Shield, AlertTriangle, Plus, Trash2 } from "lucide-react"
 import { CreatePostModal } from "@/components/create-post-modal"
 import { CreateStoryModal } from "@/components/create-story-modal"
 import { CameraModal } from "@/components/camera-modal"
 import { StoryViewer } from "@/components/story-viewer"
+import { MessagingPanel } from "@/components/messaging-panel"
 import { ThemeSwitcher } from "@/components/theme-switcher"
 
 interface Post {
@@ -57,6 +58,7 @@ export default function HomePage() {
   const [isCreateStoryOpen, setIsCreateStoryOpen] = useState(false)
   const [isCameraOpen, setIsCameraOpen] = useState(false)
   const [selectedStory, setSelectedStory] = useState<Story | null>(null)
+  const [isMessagingOpen, setIsMessagingOpen] = useState(false)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
@@ -261,15 +263,12 @@ export default function HomePage() {
   if (isLoading) {
     return (
       <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <div className="text-center space-y-6">
-          <div className="w-20 h-20 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded-full flex items-center justify-center shadow-2xl mx-auto animate-pulse">
-            <Shield className="h-10 w-10 text-white" />
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 rounded-full flex items-center justify-center shadow-2xl mx-auto animate-pulse">
+            <Shield className="h-8 w-8 text-white" />
           </div>
-          <div className="space-y-2">
-            <div className="text-xl font-semibold text-foreground">Loading SocialGuard</div>
-            <div className="text-sm text-muted-foreground">Initializing your secure social experience</div>
-          </div>
-          <div className="w-32 h-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mx-auto animate-pulse"></div>
+          <div className="text-lg font-medium text-foreground">Loading SocialGuard...</div>
+          <div className="text-sm text-muted-foreground">Initializing your secure social experience</div>
         </div>
       </div>
     )
@@ -287,58 +286,26 @@ export default function HomePage() {
           <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent">
             SocialGuard
           </h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <Link href="/analyze">
-              <Button variant="ghost" size="icon" title="Analyze Media" className="hover:bg-primary/10">
-                <Shield className="h-5 w-5" />
+              <Button variant="ghost" size="icon" title="Analyze Media">
+                <Shield className="h-6 w-6" />
               </Button>
             </Link>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setIsCreatePostOpen(true)} 
-              title="Create Post"
-              className="hover:bg-primary/10"
-            >
-              <Plus className="h-5 w-5" />
+            <Button variant="ghost" size="icon" onClick={() => setIsCreatePostOpen(true)} title="Create Post">
+              <Plus className="h-6 w-6" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setIsCameraOpen(true)} 
-              title="AI-Protected Camera"
-              className="hover:bg-primary/10"
-            >
-              <Camera className="h-5 w-5" />
+            <Button variant="ghost" size="icon" onClick={() => setIsCameraOpen(true)} title="AI-Protected Camera">
+              <Camera className="h-6 w-6" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => setIsMessagingOpen(true)}>
+              <Send className="h-6 w-6" />
             </Button>
             <ThemeSwitcher />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Avatar className="h-8 w-8 cursor-pointer ring-2 ring-primary/20 hover:ring-primary/40 transition-all">
-                  <AvatarImage src={currentUser.profilePic || "/placeholder.svg"} />
-                  <AvatarFallback className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
-                    {currentUser.username[0].toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={() => router.push("/profile")} className="cursor-pointer">
-                  <User className="h-4 w-4 mr-2" />
-                  Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => {
-                    localStorage.removeItem("currentUser")
-                    localStorage.removeItem("authToken")
-                    router.push("/auth")
-                  }}
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Avatar className="h-8 w-8 cursor-pointer" onClick={() => router.push("/profile")}>
+              <AvatarImage src={currentUser.profilePic || "/placeholder.svg"} />
+              <AvatarFallback>{currentUser.username[0].toUpperCase()}</AvatarFallback>
+            </Avatar>
           </div>
         </div>
       </header>
@@ -346,50 +313,46 @@ export default function HomePage() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Stories Section */}
         <div className="mb-8">
-          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+          <div className="flex gap-4 overflow-x-auto pb-4">
             {/* Add Story */}
             <div className="flex-shrink-0 text-center">
               <div 
-                className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-110 hover:shadow-lg"
+                className="w-16 h-16 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center cursor-pointer transition-transform hover:scale-105"
                 onClick={() => setIsCreateStoryOpen(true)}
               >
-                <Camera className="h-5 w-5 text-white" />
+                <Camera className="h-6 w-6 text-white" />
               </div>
-              <p className="text-xs mt-2 text-muted-foreground font-medium">Your Story</p>
+              <p className="text-xs mt-1 text-muted-foreground">Your Story</p>
             </div>
 
             {/* Stories */}
             {stories.map((story) => (
-              <div key={story.id} className="flex-shrink-0 text-center relative group">
+              <div key={story.id} className="flex-shrink-0 text-center relative">
                 <div
-                  className={`w-16 h-16 rounded-full p-0.5 cursor-pointer transition-all duration-300 hover:scale-110 ${
+                  className={`w-16 h-16 rounded-full p-0.5 cursor-pointer transition-transform hover:scale-105 ${
                     story.viewed ? "bg-muted-foreground/30" : "bg-gradient-to-r from-purple-500 to-pink-500"
                   }`}
                   onClick={() => setSelectedStory(story)}
                 >
                   <Avatar className="w-full h-full">
                     <AvatarImage src={story.user.profilePic || "/placeholder.svg"} />
-                    <AvatarFallback className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-semibold">
-                      {story.user.username[0].toUpperCase()}
-                    </AvatarFallback>
+                    <AvatarFallback>{story.user.username[0].toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </div>
                 
                 {/* Risk indicator for stories */}
                 {story.riskLevel === 'high' && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
                     <AlertTriangle className="h-2 w-2 text-white" />
                   </div>
                 )}
                 {story.riskLevel === 'medium' && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center shadow-lg">
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center">
                     <AlertTriangle className="h-2 w-2 text-white" />
                   </div>
                 )}
                 
-                <p className="text-xs mt-2 truncate w-16 text-muted-foreground font-medium group-hover:text-foreground transition-colors">
-                  {story.user.username}
-                </p>
+                <p className="text-xs mt-1 truncate w-16 text-muted-foreground">{story.user.username}</p>
               </div>
             ))}
           </div>
@@ -398,15 +361,13 @@ export default function HomePage() {
         {/* Posts Feed */}
         <div className="space-y-6">
           {posts.map((post) => (
-            <Card key={post.id} className="overflow-hidden border border-border/50 shadow-lg hover:shadow-xl transition-all duration-300 bg-card/50 backdrop-blur-sm">
+            <Card key={post.id} className="overflow-hidden border border-border/50 shadow-lg hover:shadow-xl transition-all duration-300">
               {/* Post Header */}
               <div className="flex items-center justify-between p-4 border-b border-border/30">
                 <div className="flex items-center gap-3">
-                  <Avatar className="ring-2 ring-primary/20 hover:ring-primary/40 transition-all">
+                  <Avatar className="ring-2 ring-primary/20">
                     <AvatarImage src={post.user.profilePic || "/placeholder.svg"} />
-                    <AvatarFallback className="bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold">
-                      {post.user.username[0].toUpperCase()}
-                    </AvatarFallback>
+                    <AvatarFallback>{post.user.username[0].toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div>
                     <p className="font-semibold text-foreground">{post.user.username}</p>
@@ -416,26 +377,26 @@ export default function HomePage() {
                 {/* Post Options Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="hover:bg-muted/50 transition-colors">
+                    <Button variant="ghost" size="icon" className="hover:bg-muted/50">
                       <MoreHorizontal className="h-5 w-5" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuContent align="end">
                     {/* Only show delete option if it's the current user's post */}
                     {currentUser && post.user.id === currentUser.id && (
                       <DropdownMenuItem 
                         onClick={() => handleDeletePost(post.id)}
-                        className="text-destructive focus:text-destructive cursor-pointer"
+                        className="text-destructive focus:text-destructive"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete Post
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem className="cursor-pointer">
+                    <DropdownMenuItem>
                       <Share className="h-4 w-4 mr-2" />
                       Share
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer">
+                    <DropdownMenuItem>
                       <Bookmark className="h-4 w-4 mr-2" />
                       Save
                     </DropdownMenuItem>
@@ -481,53 +442,39 @@ export default function HomePage() {
               </div>
 
               {/* Post Actions */}
-              <CardContent className="p-4 bg-card/50">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
+              <CardContent className="p-4 bg-card">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-4">
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handleLike(post.id)}
-                      className={`transition-all duration-200 hover:scale-110 ${post.isLiked ? "text-red-500 hover:text-red-600" : "hover:text-red-500"}`}
+                      className={`transition-colors hover:bg-muted/50 ${post.isLiked ? "text-red-500 hover:text-red-600" : "hover:text-red-500"}`}
                     >
-                      <Heart className={`h-5 w-5 transition-all ${post.isLiked ? "fill-current scale-110" : ""}`} />
+                      <Heart className={`h-6 w-6 transition-all ${post.isLiked ? "fill-current scale-110" : ""}`} />
                     </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="transition-all duration-200 hover:scale-110 hover:text-blue-500"
-                    >
-                      <MessageCircle className="h-5 w-5" />
+                    <Button variant="ghost" size="icon" className="hover:bg-muted/50 hover:text-blue-500">
+                      <MessageCircle className="h-6 w-6" />
                     </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="transition-all duration-200 hover:scale-110 hover:text-green-500"
-                    >
-                      <Share className="h-5 w-5" />
+                    <Button variant="ghost" size="icon" className="hover:bg-muted/50 hover:text-green-500">
+                      <Share className="h-6 w-6" />
                     </Button>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="transition-all duration-200 hover:scale-110 hover:text-yellow-500"
-                  >
-                    <Bookmark className="h-5 w-5" />
+                  <Button variant="ghost" size="icon" className="hover:bg-muted/50 hover:text-yellow-500">
+                    <Bookmark className="h-6 w-6" />
                   </Button>
                 </div>
 
-                <div className="space-y-2">
-                  <p className="font-semibold text-foreground">{post.likes.toLocaleString()} likes</p>
-                  <p className="text-foreground">
-                    <span className="font-semibold">{post.user.username}</span> 
-                    <span className="ml-2 text-muted-foreground">{post.caption}</span>
+                <p className="font-semibold mb-1 text-foreground">{post.likes.toLocaleString()} likes</p>
+                <p className="mb-2 text-foreground">
+                  <span className="font-semibold">{post.user.username}</span> 
+                  <span className="ml-2">{post.caption}</span>
+                </p>
+                {post.comments > 0 && (
+                  <p className="text-muted-foreground text-sm cursor-pointer hover:text-foreground transition-colors">
+                    View all {post.comments} comments
                   </p>
-                  {post.comments > 0 && (
-                    <p className="text-muted-foreground text-sm cursor-pointer hover:text-foreground transition-colors">
-                      View all {post.comments} comments
-                    </p>
-                  )}
-                </div>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -554,6 +501,8 @@ export default function HomePage() {
       />
 
       {selectedStory && <StoryViewer story={selectedStory} onClose={() => setSelectedStory(null)} />}
+
+      {isMessagingOpen && <MessagingPanel onClose={() => setIsMessagingOpen(false)} />}
     </div>
   )
 }

@@ -17,7 +17,11 @@ import {
   FileVideo,
   Loader2,
   Eye,
-  Trash2
+  Trash2,
+  Mic,
+  Brain,
+  ImageIcon,
+  Volume2
 } from 'lucide-react'
 import { useMediaAnalysis } from '@/hooks/use-media-analysis'
 import { MediaAnalysisService, MediaAnalysisResult } from '@/lib/media-analysis'
@@ -38,7 +42,7 @@ export function MediaUploadWithAnalysis({
   onFilesSelected,
   maxFiles = 5,
   autoAnalyze = true,
-  allowedTypes = ['image/*', 'video/*'],
+  allowedTypes = ['video/*'],
   className,
   showDetailedResults = true
 }: MediaUploadWithAnalysisProps) {
@@ -109,6 +113,60 @@ export function MediaUploadWithAnalysis({
     return type === 'video' ? <FileVideo className="h-5 w-5" /> : <FileImage className="h-5 w-5" />
   }
 
+  const renderBackendInfo = (result: MediaAnalysisResult) => {
+    if (!result.backendInfo) return null
+
+    const { prediction, confidence, image_importance, audio_importance, text_importance, transcript } = result.backendInfo
+
+    return (
+      <div className="mt-3 space-y-3 p-3 bg-muted/30 rounded-lg">
+        <div className="flex items-center gap-2 text-sm font-medium">
+          <Brain className="h-4 w-4 text-blue-500" />
+          AI Analysis Details
+        </div>
+        
+        {/* Prediction and Confidence */}
+        <div className="flex items-center gap-2">
+          <Badge variant={prediction === "Deepfake" ? "destructive" : "default"}>
+            {prediction}
+          </Badge>
+          <span className="text-sm text-muted-foreground">
+            Confidence: {Math.round(confidence * 100)}%
+          </span>
+        </div>
+
+        {/* Importance Scores */}
+        <div className="grid grid-cols-3 gap-2 text-xs">
+          <div className="flex items-center gap-1">
+            <ImageIcon className="h-3 w-3 text-blue-500" />
+            <span>Image: {Math.round(image_importance * 10000)}%</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Volume2 className="h-3 w-3 text-green-500" />
+            <span>Audio: {Math.round(audio_importance * 10000)}%</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Mic className="h-3 w-3 text-purple-500" />
+            <span>Text: {Math.round(text_importance * 10000)}%</span>
+          </div>
+        </div>
+
+        {/* Transcript */}
+        {transcript && transcript !== "No transcription available" && (
+          <div className="text-xs">
+            <div className="flex items-center gap-1 mb-1">
+              <Mic className="h-3 w-3 text-purple-500" />
+              <span className="font-medium">Transcript:</span>
+            </div>
+            <p className="text-muted-foreground bg-background p-2 rounded text-xs">
+              {transcript}
+            </p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className={cn("space-y-4", className)}>
       {/* Upload Area */}
@@ -125,10 +183,10 @@ export function MediaUploadWithAnalysis({
             <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <div className="space-y-2">
               <p className="text-lg font-medium">
-                {isDragActive ? "Drop files here" : "Upload media for analysis"}
+                {isDragActive ? "Drop files here" : "Upload videos for deepfake detection"}
               </p>
               <p className="text-sm text-muted-foreground">
-                Drag & drop or click to select images/videos
+                Drag & drop or click to select video files
               </p>
               <p className="text-xs text-muted-foreground">
                 Max {maxFiles} files • AI-powered deepfake detection
@@ -152,11 +210,11 @@ export function MediaUploadWithAnalysis({
           <CardContent className="p-4">
             <div className="flex items-center gap-3 mb-2">
               <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <span className="font-medium">Analyzing media...</span>
+              <span className="font-medium">Analyzing video with AI...</span>
             </div>
             <Progress value={progress} className="h-2" />
             <p className="text-sm text-muted-foreground mt-2">
-              Using advanced AI to detect deepfakes and manipulation
+              Using advanced multimodal AI to detect deepfakes
             </p>
           </CardContent>
         </Card>
@@ -169,7 +227,7 @@ export function MediaUploadWithAnalysis({
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-medium flex items-center gap-2">
                 <Shield className="h-4 w-4" />
-                Uploaded Files ({files.length})
+                Uploaded Videos ({files.length})
               </h3>
               <div className="flex items-center gap-2">
                 {!autoAnalyze && canAnalyze && (
@@ -260,11 +318,53 @@ export function MediaUploadWithAnalysis({
                           </div>
 
                           {showDetailedResults && result.details && (
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              <div>Face: {result.details.faceConsistency || 0}%</div>
-                              <div>Temporal: {result.details.temporalConsistency || 0}%</div>
-                              <div>Artifacts: {result.details.artifactDetection || 0}%</div>
-                              <div>Lighting: {result.details.lightingAnalysis || 0}%</div>
+                            <div className="space-y-2">
+                              <div className="text-xs font-medium text-muted-foreground">Analysis Metrics:</div>
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div className="flex justify-between">
+                                  <span>Face Consistency:</span>
+                                  <span className={result.details.faceConsistency > 70 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                                    {result.details.faceConsistency || 0}%
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Temporal:</span>
+                                  <span className={result.details.temporalConsistency > 70 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                                    {result.details.temporalConsistency || 0}%
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Artifacts:</span>
+                                  <span className={result.details.artifactDetection < 40 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                                    {result.details.artifactDetection || 0}%
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Lighting:</span>
+                                  <span className={result.details.lightingAnalysis > 70 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                                    {result.details.lightingAnalysis || 0}%
+                                  </span>
+                                </div>
+                                {result.details.motionAnalysis !== undefined && (
+                                  <div className="flex justify-between">
+                                    <span>Motion:</span>
+                                    <span className={result.details.motionAnalysis > 70 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                                      {result.details.motionAnalysis}%
+                                    </span>
+                                  </div>
+                                )}
+                                {result.details.audioVisualSync !== undefined && (
+                                  <div className="flex justify-between">
+                                    <span>A/V Sync:</span>
+                                    <span className={result.details.audioVisualSync > 70 ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                                      {result.details.audioVisualSync}%
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                <em>Higher scores indicate more authentic content (except Artifacts)</em>
+                              </div>
                             </div>
                           )}
 
@@ -273,6 +373,9 @@ export function MediaUploadWithAnalysis({
                               <strong>Recommendations:</strong> {result.recommendations.join(', ')}
                             </div>
                           )}
+
+                          {/* Backend Information */}
+                          {renderBackendInfo(result)}
                         </div>
                       )}
                     </div>

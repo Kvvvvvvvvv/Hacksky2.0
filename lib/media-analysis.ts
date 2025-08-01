@@ -12,6 +12,9 @@ export interface MediaAnalysisResult {
     lightingAnalysis: number
     metadataAnalysis: number
     compressionArtifacts: number
+    motionAnalysis?: number
+    audioVisualSync?: number
+    pixelPatterns?: number
   }
   recommendations: string[]
   processingTime: number
@@ -21,6 +24,15 @@ export interface MediaAnalysisResult {
     type: string
     dimensions?: { width: number; height: number }
     duration?: number
+  }
+  transcript?: string
+  backendInfo?: {
+    prediction: string
+    confidence: number
+    image_importance: number
+    audio_importance: number
+    text_importance: number
+    transcript: string
   }
 }
 
@@ -55,27 +67,35 @@ export class MediaAnalysisService {
       
       // Ensure we have valid analysis results with fallbacks
       const analysisResult: MediaAnalysisResult = {
-        confidence: result.confidence || 0,
-        isDeepfake: result.isDeepfake || false,
-        riskLevel: result.riskLevel || this.getRiskLevel(result.score || 0),
-        score: result.score || 0,
+        confidence: result.analysis?.confidence || 0,
+        isDeepfake: result.analysis?.isDeepfake || false,
+        riskLevel: result.analysis?.riskLevel || this.getRiskLevel(result.analysis?.confidence || 0),
+        score: result.analysis?.confidence || 0,
         details: {
-          faceConsistency: result.details?.faceConsistency || 0,
-          temporalConsistency: result.details?.temporalConsistency || 0,
-          artifactDetection: result.details?.artifactDetection || 0,
-          lightingAnalysis: result.details?.lightingAnalysis || 0,
-          metadataAnalysis: result.details?.metadataAnalysis || 0,
-          compressionArtifacts: result.details?.compressionArtifacts || 0,
+          faceConsistency: result.analysis?.details?.faceConsistency || 0,
+          temporalConsistency: result.analysis?.details?.temporalConsistency || 0,
+          artifactDetection: result.analysis?.details?.artifactDetection || 0,
+          lightingAnalysis: result.analysis?.details?.lightingAnalysis || 0,
+          metadataAnalysis: result.analysis?.details?.metadataAnalysis || 0,
+          compressionArtifacts: result.analysis?.details?.compressionArtifacts || 0,
         },
-        recommendations: result.recommendations || [],
+        recommendations: result.analysis?.recommendation ? [result.analysis.recommendation] : [],
         processingTime,
         fileInfo: {
           name: file.name,
           size: file.size,
           type: file.type,
-          dimensions: result.fileInfo?.dimensions,
-          duration: result.fileInfo?.duration
-        }
+          dimensions: result.analysis?.fileInfo?.dimensions,
+          duration: result.analysis?.fileInfo?.duration
+        },
+        // Add transcript if available
+        ...(result.analysis?.transcript && {
+          transcript: result.analysis.transcript
+        }),
+        // Add backend information if available
+        ...(result.backend && {
+          backendInfo: result.backend
+        })
       }
       
       return analysisResult
@@ -156,15 +176,14 @@ export class MediaAnalysisService {
   
   static isValidMediaFile(file: File): boolean {
     const validTypes = [
-      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-      'video/mp4', 'video/webm', 'video/ogg', 'video/avi'
+      'video/mp4', 'video/webm', 'video/ogg', 'video/avi', 'video/quicktime'
     ]
     return validTypes.includes(file.type)
   }
   
   static getFileType(file: File): 'image' | 'video' | 'unknown' {
-    if (file.type.startsWith('image/')) return 'image'
     if (file.type.startsWith('video/')) return 'video'
+    if (file.type.startsWith('image/')) return 'image'
     return 'unknown'
   }
 }

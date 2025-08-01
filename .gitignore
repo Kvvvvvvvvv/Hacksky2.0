@@ -25,3 +25,35 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Machine Learning Models
+*.pkl
+*.h5
+*.model
+
+# Uploads
+public/uploads/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/

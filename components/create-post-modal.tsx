@@ -55,6 +55,15 @@ interface AnalysisResult {
   filename?: string
   filesize?: string
   filetype?: string
+  // Backend information from FastAPI
+  backendInfo?: {
+    prediction: string
+    confidence: number
+    image_importance: number
+    audio_importance: number
+    text_importance: number
+    transcript: string
+  }
 }
 
 interface FileAnalysis {
@@ -167,6 +176,73 @@ const DetailedAnalysisDialog = ({ fileAnalysis, isOpen, onClose }: DetailedAnaly
               <strong>Recommendation:</strong> {analysis.recommendation}
             </AlertDescription>
           </Alert>
+
+          {/* Backend AI Analysis Details (if available) */}
+          {analysis.backendInfo && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center space-x-2">
+                  <Brain className="h-5 w-5 text-blue-500" />
+                  <span>AI Model Analysis</span>
+                  <Badge variant="outline" className="text-xs">FastAPI Backend</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm font-medium">Prediction</div>
+                      <Badge 
+                        variant={analysis.backendInfo.prediction === "Deepfake" ? "destructive" : "default"}
+                        className="mt-1"
+                      >
+                        {analysis.backendInfo.prediction}
+                      </Badge>
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium">Model Confidence</div>
+                      <div className="text-lg font-bold text-primary">
+                        {Math.round(analysis.backendInfo.confidence * 100)}%
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="text-sm font-medium mb-2">Component Importance</div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div className="text-center p-2 bg-blue-50 rounded">
+                        <div className="font-bold text-blue-600">
+                          {Math.round(analysis.backendInfo.image_importance * 100)}%
+                        </div>
+                        <div className="text-blue-600">Image</div>
+                      </div>
+                      <div className="text-center p-2 bg-green-50 rounded">
+                        <div className="font-bold text-green-600">
+                          {Math.round(analysis.backendInfo.audio_importance * 100)}%
+                        </div>
+                        <div className="text-green-600">Audio</div>
+                      </div>
+                      <div className="text-center p-2 bg-purple-50 rounded">
+                        <div className="font-bold text-purple-600">
+                          {Math.round(analysis.backendInfo.text_importance * 100)}%
+                        </div>
+                        <div className="text-purple-600">Text</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {analysis.backendInfo.transcript && analysis.backendInfo.transcript !== "No transcription available" && (
+                    <div>
+                      <div className="text-sm font-medium mb-2">Audio Transcript</div>
+                      <div className="text-sm bg-gray-50 p-3 rounded border">
+                        {analysis.backendInfo.transcript}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
         
         <DialogFooter>
@@ -241,84 +317,45 @@ export function CreatePostModal({ isOpen, onClose, onPostCreated }: CreatePostMo
       if (!data.success) {
         throw new Error(data.error || 'Analysis failed')
       }
+
+      // USE THE ACTUAL BACKEND RESPONSE - NO MORE FAKE DATA!
+      // The API response includes both 'analysis' (converted format) and 'backend' (raw FastAPI response)
+      const result = data.analysis
       
-      return data.analysis
-    } catch (error) {
-      // Fallback to client-side heuristic analysis
-      const filename = file.name.toLowerCase()
-      const filesize = formatFileSize(file.size)
-      const filetype = getFileType(file)
-      
-      let confidence = Math.random() * 100
-      let riskLevel: 'low' | 'medium' | 'high' = 'low'
-      let recommendation = ''
-      
-      // Check for suspicious patterns in filename
-      const suspiciousPatterns = [
-        'fake', 'deepfake', 'ai_generated', 'synthetic', 'generated',
-        'face_swap', 'faceswap', 'manipulated', 'edited', 'modified'
-      ]
-      
-      const realPatterns = [
-        'real', 'original', 'authentic', 'genuine', 'unedited',
-        'raw', 'camera', 'phone', 'selfie', 'photo'
-      ]
-      
-      const hasSuspiciousPattern = suspiciousPatterns.some(pattern => filename.includes(pattern))
-      const hasRealPattern = realPatterns.some(pattern => filename.includes(pattern))
-      
-      if (hasSuspiciousPattern) {
-        confidence = Math.random() * 30 + 70
-        riskLevel = 'high'
-        recommendation = 'File contains suspicious naming patterns. Manual review recommended.'
-      } else if (hasRealPattern) {
-        confidence = Math.random() * 30 + 10
-        riskLevel = 'low'
-        recommendation = 'File appears to be authentic based on naming patterns.'
-      } else {
-        const extension = filename.split('.').pop() || ''
-        const nameWithoutExt = filename.replace(`.${extension}`, '')
-        
-        if (nameWithoutExt.length < 3 || /^\d+$/.test(nameWithoutExt)) {
-          confidence = Math.random() * 20 + 40
-          riskLevel = 'medium'
-          recommendation = 'Unusual filename pattern detected. Consider verification.'
+      // Add the raw backend information for detailed display
+      if (data.backend) {
+        result.backendInfo = {
+          prediction: data.backend.prediction,
+          confidence: data.backend.confidence,
+          image_importance: data.backend.image_importance,
+          audio_importance: data.backend.audio_importance,
+          text_importance: data.backend.text_importance,
+          transcript: data.backend.transcript
         }
       }
       
-      if (file.size < 10000) {
-        confidence += 20
-        riskLevel = 'medium'
-      } else if (file.size > 100000000) {
-        confidence -= 10
-      }
+      return result
+    } catch (error) {
+      console.error('Backend analysis failed:', error)
       
-      const isDeepfake = confidence > 50
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 3000))
-      
+      // Only return an error result, don't generate fake data
       return {
-        confidence: Math.round(confidence),
-        isDeepfake,
+        confidence: 0,
+        isDeepfake: false,
         details: {
-          faceConsistency: Math.round(100 - confidence + Math.random() * 20),
-          temporalConsistency: filetype === 'video' ? Math.round(100 - confidence + Math.random() * 20) : Math.round(100 - confidence + Math.random() * 15),
-          artifactDetection: Math.round(confidence + Math.random() * 10),
-          lightingAnalysis: Math.round(90 - confidence * 0.5 + Math.random() * 20),
-          compressionArtifacts: Math.round(confidence * 0.8 + Math.random() * 20),
-          ...(filetype === 'video' && {
-            motionAnalysis: Math.round(100 - confidence + Math.random() * 15),
-            audioVisualSync: Math.round(95 - confidence * 0.3 + Math.random() * 10)
-          })
+          faceConsistency: 0,
+          temporalConsistency: 0,
+          artifactDetection: 0,
+          lightingAnalysis: 0,
+          compressionArtifacts: 0,
         },
-        processingTime: `${(2 + Math.random() * 3).toFixed(1)}s`,
-        modelVersion: "v3.2.1",
-        riskLevel,
-        recommendation,
+        processingTime: '0s',
+        modelVersion: "Backend Unavailable",
+        riskLevel: 'low' as const,
+        recommendation: 'Backend analysis failed. Please ensure the FastAPI server is running on localhost:8000',
         filename: file.name,
-        filesize,
-        filetype
+        filesize: formatFileSize(file.size),
+        filetype: getFileType(file)
       }
     }
   }
@@ -523,7 +560,23 @@ export function CreatePostModal({ isOpen, onClose, onPostCreated }: CreatePostMo
           },
           mediaUrl: mediaUrl, // Use the uploaded file URL
           caption: postCaption,
-          deepfakeScore: fileAnalysis.analysis?.confidence || 0,
+          // Calculate the correct deepfake score based on the backend prediction
+          deepfakeScore: (() => {
+            if (fileAnalysis.analysis?.backendInfo) {
+              const confidence = fileAnalysis.analysis.backendInfo.confidence
+              const prediction = fileAnalysis.analysis.backendInfo.prediction
+              
+              // If backend says "Real", then deepfake score is (1 - confidence)
+              // If backend says "Deepfake", then deepfake score is confidence
+              if (prediction === "Real") {
+                return Math.round((1 - confidence) * 100)
+              } else {
+                return Math.round(confidence * 100)
+              }
+            }
+            // Fallback to analysis confidence (already in percentage)
+            return fileAnalysis.analysis?.confidence || 0
+          })(),
           likes: 0,
           comments: 0,
           timestamp: "Just now",

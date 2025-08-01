@@ -45,7 +45,24 @@ export async function createPost(
   try {
     const db = await getDatabase()
     
-    const deepfakeScore = analysisResult?.confidence || 0
+    // Calculate the correct deepfake score based on backend prediction
+    let deepfakeScore = 0
+    if (analysisResult?.backendInfo) {
+      const confidence = analysisResult.backendInfo.confidence
+      const prediction = analysisResult.backendInfo.prediction
+      
+      // If backend says "Real", then deepfake score is (1 - confidence)
+      // If backend says "Deepfake", then deepfake score is confidence
+      if (prediction === "Real") {
+        deepfakeScore = Math.round((1 - confidence) * 100)
+      } else {
+        deepfakeScore = Math.round(confidence * 100)
+      }
+    } else {
+      // Fallback to analysis confidence (already in percentage)
+      deepfakeScore = analysisResult?.confidence || 0
+    }
+    
     const riskLevel = analysisResult?.riskLevel || 'low'
     const analysisJson = analysisResult ? JSON.stringify(analysisResult) : null
     

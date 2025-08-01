@@ -138,13 +138,33 @@ export async function POST(request: NextRequest) {
       minute: '2-digit'
     })
 
+    // Calculate the correct deepfake score based on backend prediction
+    const calculateDeepfakeScore = (analysisResult: any): number => {
+      if (analysisResult?.backendInfo) {
+        const confidence = analysisResult.backendInfo.confidence
+        const prediction = analysisResult.backendInfo.prediction
+        
+        // If backend says "Real", then deepfake score is (1 - confidence)
+        // If backend says "Deepfake", then deepfake score is confidence
+        if (prediction === "Real") {
+          return Math.round((1 - confidence) * 100)
+        } else {
+          return Math.round(confidence * 100)
+        }
+      }
+      // Fallback to analysis confidence (already in percentage)
+      return analysisResult?.confidence || 0
+    }
+
+    const deepfakeScore = calculateDeepfakeScore(data.analysisResult)
+
     const post = {
       id: (postId || Date.now()).toString(),
       userId: userId.toString(),
       mediaUrl,
       mediaType,
       caption: data.caption,
-      deepfakeScore: data.analysisResult?.confidence || 0,
+      deepfakeScore,
       likes: 0,
       comments: 0,
       createdAt: istFormatter.format(new Date()),
@@ -161,7 +181,7 @@ export async function POST(request: NextRequest) {
       success: true,
       post,
       postId: postId || Date.now(),
-      deepfakeScore: data.analysisResult?.confidence || 0,
+      deepfakeScore,
       message: postId ? 'Post created successfully' : 'Post created in demo mode'
     })
 
